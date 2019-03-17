@@ -23,6 +23,8 @@ import { toFileName } from "./name-utils";
 const util = require('util');
 const xml2js = require('xml2js');
 import * as stripJsonComments from 'strip-json-comments';
+import { NodePackageInstallTask } from "@angular-devkit/schematics/tasks";
+import { getNxDependencies, getNativescriptDependencies } from "./dependencies";
 
 export const supportedPlatforms = [
   "web",
@@ -168,7 +170,7 @@ export function getNxWorkspaceConfig(tree: Tree): any {
 /**
  * Returns a name with the platform.
  * 
- * @example (app, nest) => web-app or app-web
+ * @example ("app", "web") => "web-app" or "app-web"
  * @param name 
  * @param platform 
  */
@@ -263,6 +265,19 @@ export function sanitizeCommaDelimitedArg(input: string): Array<string> {
   return [];
 }
 
+/**
+ * Check if the platform will need a web app to be generated.
+ * 
+ * Useful for deciding which dependencies or files should be added .
+ * 
+ * @param targetPlatforms 
+ */
+export function hasWebPlatform(targetPlatforms: ITargetPlatforms) {
+  return (
+    targetPlatforms.web || targetPlatforms.ionic || targetPlatforms.electron
+  );
+}
+
 export function addRootDeps(
   tree: Tree,
   targetPlatforms: ITargetPlatforms,
@@ -273,7 +288,8 @@ export function addRootDeps(
     packageJson = getJsonFromFile(tree, packagePath);
   }
   if (packageJson) {
-    const angularVersion = packageJson.dependencies['@angular/core'];
+    const angularVersion = packageJson.dependencies['@angular/core'] || "^7.0.0";
+    const nxVersion = packageJson.devDependencies['@nrwl/schematics'] || packageJson.dependencies['@nrwl/schematics'];
 
     const deps: NodeDependency[] = [];
 
@@ -291,7 +307,9 @@ export function addRootDeps(
     };
     deps.push(dep);
 
-    if (!targetPlatforms.nest) {
+    deps.push(...getNxDependencies(nxVersion, angularVersion));
+
+    if (hasWebPlatform(targetPlatforms)) {
       // if just setting up workspace with nest, we don't need frontend scss
       dep = {
         name: `@${getNpmScope()}/scss`,
@@ -310,46 +328,7 @@ export function addRootDeps(
 
     /** NATIVESCRIPT */
     if (targetPlatforms.nativescript) {
-      dep = {
-        name: "nativescript-angular",
-        version: "~7.2.0",
-        type: "dependency"
-      };
-      deps.push(dep);
-
-      dep = {
-        name: "nativescript-ngx-fonticon",
-        version: "^4.2.0",
-        type: "dependency"
-      };
-      deps.push(dep);
-
-      dep = {
-        name: "nativescript-theme-core",
-        version: "^1.0.4",
-        type: "dependency"
-      };
-      deps.push(dep);
-
-      dep = {
-        name: "tns-core-modules",
-        version: "~5.2.0",
-        type: "dependency"
-      };
-      deps.push(dep);
-
-      dep = {
-        name: "terser-webpack-plugin",
-        version: "~1.2.0",
-        type: "devDependency"
-      };
-
-      dep = {
-        name: "tns-platform-declarations",
-        version: "~5.2.0",
-        type: "devDependency"
-      };
-      deps.push(dep);
+      deps.push(...getNativescriptDependencies(angularVersion))
     }
 
     /** IONIC */
@@ -1315,3 +1294,8 @@ export const toComponentClassName = (name: string) =>
   `${classify(name)}Component`;
 
 export const toNgModuleClassName = (name: string) => `${classify(name)}Module`;
+
+export function addInstall(host: Tree, context: SchematicContext) {
+  context.addTask(new NodePackageInstallTask());
+  return host;
+}

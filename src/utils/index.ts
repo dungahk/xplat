@@ -1,4 +1,5 @@
 export * from './ast';
+export * from './dependencies';
 export * from './errors';
 export * from './format-files';
 export * from './general';

@@ -1,4 +1,6 @@
 import { SchematicContext, Tree, externalSchematic, SchematicsException } from '@angular-devkit/schematics';
+import { readJsonInTree } from './ast';
+import { updateJsonFile } from './general';
 
 export function createEmptyWorkspace(tree: Tree): Tree {
     tree.create('/angular.json', JSON.stringify({
@@ -36,6 +38,14 @@ export function createEmptyWorkspace(tree: Tree): Tree {
       }
     }));
     return tree;
+}
+
+export function addNxSchematicToWorkspace(tree: Tree): Tree {
+  const packageJsonPath = '/package.json';
+  const packageJson = readJsonInTree(tree, packageJsonPath);
+  packageJson.devDependencies["@nrwl/schematics"] = "~7.0.0";
+  
+  return updateJsonFile(tree, packageJsonPath, packageJson)
 }
 
 export function createXplatWithAppsForElectron(tree: Tree): Tree {
